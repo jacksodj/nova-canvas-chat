@@ -35,7 +35,7 @@ aws cloudformation wait stack-create-complete \
 
 ### Option 2: Deploy with Fine-Tuned Models
 
-See **[FINE-TUNED-MODELS-GUIDE.md](FINE-TUNED-MODELS-GUIDE.md)** for the 5-minute quick start!
+See **[FINE-TUNED-MODELS-GUIDE.md](docs/FINE-TUNED-MODELS-GUIDE.md)** for the 5-minute quick start!
 
 ```bash
 # Discover all your models (fine-tuned, provisioned, on-demand)
@@ -83,18 +83,19 @@ This script will:
 - ✅ **Auto-generate complete LiteLLM config**
 - ✅ Show exact deployment commands
 
-**For complete guide**: See [FINE-TUNED-MODELS-GUIDE.md](FINE-TUNED-MODELS-GUIDE.md)
+**For complete guide**: See [FINE-TUNED-MODELS-GUIDE.md](docs/FINE-TUNED-MODELS-GUIDE.md)
 
 ## 📁 Repository Structure
 
 ```
 nova-canvas-chat/
 ├── README.md                           # This file
-├── FINE-TUNED-MODELS-GUIDE.md         # Quick start for custom models
-├── LOCAL-TESTING-RESULTS.md            # Test validation report
 ├── docker-compose.yml                  # Local testing environment
 ├── litellm-config.yaml                 # Model configuration
 ├── test-local.sh                       # Local testing script
+├── docs/
+│   ├── FINE-TUNED-MODELS-GUIDE.md     # Quick start for custom models ⭐
+│   └── LOCAL-TESTING-RESULTS.md        # Test validation report
 └── infrastructure/
     ├── bedrock-image-chat-stack.yaml   # CloudFormation template (30KB)
     ├── parameters.json                 # Deployment parameters
@@ -122,10 +123,10 @@ nova-canvas-chat/
 
 | Document | Description |
 |----------|-------------|
-| [FINE-TUNED-MODELS-GUIDE.md](FINE-TUNED-MODELS-GUIDE.md) | **⭐ Quick start for adding custom models (5 min)** |
+| [FINE-TUNED-MODELS-GUIDE.md](docs/FINE-TUNED-MODELS-GUIDE.md) | **⭐ Quick start for adding custom models (5 min)** |
 | [infrastructure/README.md](infrastructure/README.md) | Complete deployment guide |
 | [infrastructure/litellm-config-guide.md](infrastructure/litellm-config-guide.md) | Advanced LiteLLM configuration |
-| [LOCAL-TESTING-RESULTS.md](LOCAL-TESTING-RESULTS.md) | Validation and test results |
+| [LOCAL-TESTING-RESULTS.md](docs/LOCAL-TESTING-RESULTS.md) | Validation and test results |
 
 ## 🔧 Prerequisites
 
@@ -178,7 +179,7 @@ curl -X POST 'http://localhost:4000/v1/images/generations' \
   }'
 ```
 
-Results: See [LOCAL-TESTING-RESULTS.md](LOCAL-TESTING-RESULTS.md)
+Results: See [LOCAL-TESTING-RESULTS.md](docs/LOCAL-TESTING-RESULTS.md)
 
 ## 🚨 Common Issues & Solutions
 
@@ -234,11 +235,11 @@ See [LICENSE](LICENSE) file.
 
 ## ⭐ Quick Links
 
-- **Add Fine-Tuned Models**: [FINE-TUNED-MODELS-GUIDE.md](FINE-TUNED-MODELS-GUIDE.md)
+- **Add Fine-Tuned Models**: [FINE-TUNED-MODELS-GUIDE.md](docs/FINE-TUNED-MODELS-GUIDE.md)
 - **Full Deployment Guide**: [infrastructure/README.md](infrastructure/README.md)
 - **Model Discovery Tool**: `infrastructure/discover-models.sh`
 - **Local Testing**: `./test-local.sh`
 
 ---
 
-**Ready to deploy?** Start with [FINE-TUNED-MODELS-GUIDE.md](FINE-TUNED-MODELS-GUIDE.md) or jump directly to `infrastructure/README.md`!
+**Ready to deploy?** Start with [FINE-TUNED-MODELS-GUIDE.md](docs/FINE-TUNED-MODELS-GUIDE.md) or jump directly to `infrastructure/README.md`!
