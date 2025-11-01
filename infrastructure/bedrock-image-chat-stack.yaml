@@ -1,0 +1,1034 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Text-to-Image Chat Interface with AWS Bedrock Nova Canvas - Provisioned Throughput Support'
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+          - Environment
+          - DeploymentSize
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - VpcCIDR
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - PrivateSubnet1CIDR
+          - PrivateSubnet2CIDR
+      - Label:
+          default: "Bedrock Configuration"
+        Parameters:
+          - BedrockRegion
+          - ProvisionedModelArn
+          - EnabledModels
+      - Label:
+          default: "Security Configuration"
+        Parameters:
+          - ACMCertificateArn
+          - AllowedCIDR
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: "bedrock-image-chat"
+    Description: "Project name used for resource naming and tagging"
+    AllowedPattern: "^[a-z0-9-]+$"
+    ConstraintDescription: "Must contain only lowercase letters, numbers, and hyphens"
+
+  Environment:
+    Type: String
+    Default: "production"
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: "Environment name for deployment"
+
+  DeploymentSize:
+    Type: String
+    Default: "small"
+    AllowedValues:
+      - small
+      - medium
+      - large
+    Description: "Deployment size affecting task count and resources"
+
+  VpcCIDR:
+    Type: String
+    Default: "10.0.0.0/16"
+    Description: "CIDR block for VPC"
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+
+  PublicSubnet1CIDR:
+    Type: String
+    Default: "10.0.1.0/24"
+    Description: "CIDR block for public subnet 1"
+
+  PublicSubnet2CIDR:
+    Type: String
+    Default: "10.0.2.0/24"
+    Description: "CIDR block for public subnet 2"
+
+  PrivateSubnet1CIDR:
+    Type: String
+    Default: "10.0.10.0/24"
+    Description: "CIDR block for private subnet 1"
+
+  PrivateSubnet2CIDR:
+    Type: String
+    Default: "10.0.11.0/24"
+    Description: "CIDR block for private subnet 2"
+
+  BedrockRegion:
+    Type: String
+    Default: "us-east-1"
+    AllowedValues:
+      - us-east-1
+      - us-west-2
+      - eu-west-1
+      - ap-northeast-1
+    Description: "AWS region for Bedrock model access"
+
+  ProvisionedModelArn:
+    Type: String
+    Default: ""
+    Description: "Optional ARN of provisioned throughput model (e.g., arn:aws:bedrock:us-east-1:123456789012:provisioned-model/xxxxx)"
+
+  EnabledModels:
+    Type: CommaDelimitedList
+    Default: "nova-canvas,claude-sonnet,titan-image"
+    Description: "Comma-separated list of models to enable"
+
+  ACMCertificateArn:
+    Type: String
+    Default: ""
+    Description: "ACM certificate ARN for HTTPS (leave empty to use HTTP only)"
+
+  AllowedCIDR:
+    Type: String
+    Default: "0.0.0.0/0"
+    Description: "CIDR block allowed to access the ALB (0.0.0.0/0 for public access)"
+
+Conditions:
+  IsSmall: !Equals [!Ref DeploymentSize, "small"]
+  IsMedium: !Equals [!Ref DeploymentSize, "medium"]
+  IsLarge: !Equals [!Ref DeploymentSize, "large"]
+  HasACMCertificate: !Not [!Equals [!Ref ACMCertificateArn, ""]]
+  HasProvisionedModel: !Not [!Equals [!Ref ProvisionedModelArn, ""]]
+
+Resources:
+  # ============================================================================
+  # VPC and Networking Resources
+  # ============================================================================
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-vpc"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-igw"
+        - Key: Environment
+          Value: !Ref Environment
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Public Subnets
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet1CIDR
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-public-subnet-1"
+        - Key: Type
+          Value: Public
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet2CIDR
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-public-subnet-2"
+        - Key: Type
+          Value: Public
+
+  # Private Subnets
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-private-subnet-1"
+        - Key: Type
+          Value: Private
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-private-subnet-2"
+        - Key: Type
+          Value: Private
+
+  # Route Tables
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-public-rt"
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-private-rt"
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  # ============================================================================
+  # VPC Endpoints (Cost-optimized: no NAT Gateway needed)
+  # ============================================================================
+
+  VPCEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${ProjectName}-vpce-sg"
+      GroupDescription: "Security group for VPC endpoints"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref ContainerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-vpce-sg"
+
+  BedrockVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.bedrock-runtime"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+
+  ECRApiVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.api"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+
+  ECRDkrVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+
+  S3VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+
+  LogsVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+
+  # ============================================================================
+  # Security Groups
+  # ============================================================================
+
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${ProjectName}-alb-sg"
+      GroupDescription: "Security group for Application Load Balancer"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref AllowedCIDR
+          Description: "HTTP access"
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref AllowedCIDR
+          Description: "HTTPS access"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: "Allow all outbound traffic"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-alb-sg"
+
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${ProjectName}-container-sg"
+      GroupDescription: "Security group for ECS containers"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+          Description: "Open WebUI from ALB"
+        - IpProtocol: tcp
+          FromPort: 4000
+          ToPort: 4000
+          Description: "LiteLLM internal"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: "Allow all outbound traffic"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-container-sg"
+
+  # Allow containers to talk to each other
+  ContainerSecurityGroupIngressSelf:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ContainerSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref ContainerSecurityGroup
+      Description: "Allow containers to communicate"
+
+  EFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${ProjectName}-efs-sg"
+      GroupDescription: "Security group for EFS mount targets"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref ContainerSecurityGroup
+          Description: "NFS from containers"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-efs-sg"
+
+  # ============================================================================
+  # IAM Roles and Policies
+  # ============================================================================
+
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-task-execution-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource:
+                  - !Ref LiteLLMAPIKeySecret
+                  - !Ref OpenWebUIAdminSecret
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-task-execution-role"
+
+  ECSTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-task-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BedrockAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                  - bedrock:ListFoundationModels
+                  - bedrock:GetFoundationModel
+                  - bedrock:GetProvisionedModelThroughput
+                  - bedrock:ListProvisionedModelThroughputs
+                Resource:
+                  - !Sub "arn:aws:bedrock:${BedrockRegion}::foundation-model/*"
+                  - !If
+                    - HasProvisionedModel
+                    - !Ref ProvisionedModelArn
+                    - !Ref AWS::NoValue
+        - PolicyName: EFSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - elasticfilesystem:ClientMount
+                  - elasticfilesystem:ClientWrite
+                  - elasticfilesystem:DescribeMountTargets
+                  - elasticfilesystem:DescribeFileSystems
+                Resource: !GetAtt EFSFileSystem.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-task-role"
+
+  # ============================================================================
+  # EFS File System
+  # ============================================================================
+
+  EFSFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+      BackupPolicy:
+        Status: ENABLED
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-efs"
+        - Key: Environment
+          Value: !Ref Environment
+
+  EFSMountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SubnetId: !Ref PrivateSubnet1
+      SecurityGroups:
+        - !Ref EFSSecurityGroup
+
+  EFSMountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SubnetId: !Ref PrivateSubnet2
+      SecurityGroups:
+        - !Ref EFSSecurityGroup
+
+  # ============================================================================
+  # CloudWatch Logs
+  # ============================================================================
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${ProjectName}"
+      RetentionInDays: 7
+
+  # ============================================================================
+  # Secrets Manager
+  # ============================================================================
+
+  LiteLLMAPIKeySecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}/litellm-api-key"
+      Description: "LiteLLM API key for Open WebUI authentication"
+      GenerateSecretString:
+        SecretStringTemplate: '{}'
+        GenerateStringKey: api_key
+        PasswordLength: 32
+        ExcludeCharacters: '"@/\'
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-litellm-key"
+
+  OpenWebUIAdminSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}/openwebui-admin"
+      Description: "Open WebUI initial admin password"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: password
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-admin-secret"
+
+  # ============================================================================
+  # Service Discovery
+  # ============================================================================
+
+  ServiceDiscoveryNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: !Sub "${ProjectName}.local"
+      Vpc: !Ref VPC
+      Description: "Private DNS namespace for service discovery"
+
+  LiteLLMServiceDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: litellm
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 60
+        NamespaceId: !Ref ServiceDiscoveryNamespace
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+
+  # ============================================================================
+  # ECS Cluster
+  # ============================================================================
+
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${ProjectName}-cluster"
+      CapacityProviders:
+        - FARGATE
+        - FARGATE_SPOT
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 1
+          Base: 1
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-cluster"
+
+  # ============================================================================
+  # ECS Task Definitions
+  # ============================================================================
+
+  LiteLLMTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ProjectName}-litellm"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: '512'
+      Memory: '1024'
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: litellm
+          Image: ghcr.io/berriai/litellm:main-latest
+          Essential: true
+          PortMappings:
+            - ContainerPort: 4000
+              Protocol: tcp
+          Environment:
+            - Name: AWS_REGION_NAME
+              Value: !Ref BedrockRegion
+            - Name: LITELLM_MODE
+              Value: PROXY
+            - Name: LITELLM_MASTER_KEY
+              Value: !Sub "{{resolve:secretsmanager:${LiteLLMAPIKeySecret}:SecretString:api_key}}"
+            - Name: DATABASE_URL
+              Value: "sqlite:////tmp/litellm.db"
+            - Name: STORE_MODEL_IN_DB
+              Value: "True"
+            - Name: LITELLM_CONFIG
+              Value: !Sub |
+                model_list:
+                  - model_name: nova-canvas
+                    litellm_params:
+                      model: bedrock/amazon.nova-canvas-v1:0
+                      aws_region_name: ${BedrockRegion}
+                  - model_name: claude-sonnet
+                    litellm_params:
+                      model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
+                      aws_region_name: ${BedrockRegion}
+                      stream: true
+                  - model_name: titan-image
+                    litellm_params:
+                      model: bedrock/amazon.titan-image-generator-v2:0
+                      aws_region_name: ${BedrockRegion}
+                litellm_settings:
+                  drop_params: true
+                  set_verbose: false
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: litellm
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - curl -f http://localhost:4000/health || exit 1
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+
+  OpenWebUITaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ProjectName}-openwebui"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !If [IsSmall, '1024', !If [IsMedium, '2048', '4096']]
+      Memory: !If [IsSmall, '2048', !If [IsMedium, '4096', '8192']]
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: openwebui
+          Image: ghcr.io/open-webui/open-webui:latest
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          Environment:
+            - Name: OPENAI_API_BASE_URL
+              Value: !Sub "http://litellm.${ProjectName}.local:4000/v1"
+            - Name: OPENAI_API_KEY
+              Value: !Sub "{{resolve:secretsmanager:${LiteLLMAPIKeySecret}:SecretString:api_key}}"
+            - Name: WEBUI_AUTH
+              Value: "True"
+            - Name: WEBUI_NAME
+              Value: "Bedrock Image Chat"
+            - Name: ENABLE_IMAGE_GENERATION
+              Value: "True"
+            - Name: IMAGE_GENERATION_ENGINE
+              Value: "openai"
+            - Name: AUTOMATIC_IMAGE_GENERATION
+              Value: "False"
+            - Name: ENV
+              Value: !Ref Environment
+          MountPoints:
+            - SourceVolume: efs-storage
+              ContainerPath: /app/backend/data
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: openwebui
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 120
+      Volumes:
+        - Name: efs-storage
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref EFSFileSystem
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              IAM: ENABLED
+
+  # ============================================================================
+  # Application Load Balancer
+  # ============================================================================
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${ProjectName}-alb"
+      Type: application
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-alb"
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${ProjectName}-tg"
+      VpcId: !Ref VPC
+      Port: 8080
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: 200
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '30'
+        - Key: stickiness.enabled
+          Value: 'true'
+        - Key: stickiness.type
+          Value: lb_cookie
+        - Key: stickiness.lb_cookie.duration_seconds
+          Value: '86400'
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-tg"
+
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - !If
+          - HasACMCertificate
+          - Type: redirect
+            RedirectConfig:
+              Protocol: HTTPS
+              Port: '443'
+              StatusCode: HTTP_301
+          - Type: forward
+            TargetGroupArn: !Ref TargetGroup
+
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasACMCertificate
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !Ref ACMCertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # ============================================================================
+  # ECS Services
+  # ============================================================================
+
+  LiteLLMService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - LiteLLMServiceDiscovery
+    Properties:
+      ServiceName: !Sub "${ProjectName}-litellm"
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref LiteLLMTaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+          SecurityGroups:
+            - !Ref ContainerSecurityGroup
+      ServiceRegistries:
+        - RegistryArn: !GetAtt LiteLLMServiceDiscovery.Arn
+      EnableExecuteCommand: true
+      PropagateTags: SERVICE
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-litellm-service"
+
+  OpenWebUIService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - HTTPListener
+      - LiteLLMService
+      - EFSMountTarget1
+      - EFSMountTarget2
+    Properties:
+      ServiceName: !Sub "${ProjectName}-openwebui"
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref OpenWebUITaskDefinition
+      DesiredCount: !If [IsSmall, 1, !If [IsMedium, 2, 3]]
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+          SecurityGroups:
+            - !Ref ContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: openwebui
+          ContainerPort: 8080
+          TargetGroupArn: !Ref TargetGroup
+      HealthCheckGracePeriodSeconds: 300
+      EnableExecuteCommand: true
+      PropagateTags: SERVICE
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-openwebui-service"
+
+  # ============================================================================
+  # Auto Scaling
+  # ============================================================================
+
+  OpenWebUIAutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      ServiceNamespace: ecs
+      ResourceId: !Sub "service/${ECSCluster}/${OpenWebUIService.Name}"
+      ScalableDimension: ecs:service:DesiredCount
+      MinCapacity: 1
+      MaxCapacity: 10
+      RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+
+  OpenWebUIAutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${ProjectName}-cpu-scaling"
+      ServiceNamespace: ecs
+      ResourceId: !Sub "service/${ECSCluster}/${OpenWebUIService.Name}"
+      ScalableDimension: ecs:service:DesiredCount
+      PolicyType: TargetTrackingScaling
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 70
+        ScaleInCooldown: 300
+        ScaleOutCooldown: 60
+
+  # ============================================================================
+  # CloudWatch Alarms
+  # ============================================================================
+
+  HighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-high-cpu"
+      AlarmDescription: "Alert when CPU exceeds 80%"
+      MetricName: CPUUtilization
+      Namespace: AWS/ECS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ECSCluster
+        - Name: ServiceName
+          Value: !GetAtt OpenWebUIService.Name
+
+  HighMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-high-memory"
+      AlarmDescription: "Alert when memory exceeds 85%"
+      MetricName: MemoryUtilization
+      Namespace: AWS/ECS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 85
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ECSCluster
+        - Name: ServiceName
+          Value: !GetAtt OpenWebUIService.Name
+
+  UnhealthyHostAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-unhealthy-hosts"
+      AlarmDescription: "Alert when unhealthy host count is greater than 0"
+      MetricName: UnHealthyHostCount
+      Namespace: AWS/ApplicationELB
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !GetAtt ApplicationLoadBalancer.LoadBalancerFullName
+        - Name: TargetGroup
+          Value: !GetAtt TargetGroup.TargetGroupFullName
+
+# ============================================================================
+# Outputs
+# ============================================================================
+
+Outputs:
+  VPCId:
+    Description: "VPC ID"
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${ProjectName}-vpc-id"
+
+  ALBEndpoint:
+    Description: "Application Load Balancer endpoint URL"
+    Value: !If
+      - HasACMCertificate
+      - !Sub "https://${ApplicationLoadBalancer.DNSName}"
+      - !Sub "http://${ApplicationLoadBalancer.DNSName}"
+    Export:
+      Name: !Sub "${ProjectName}-alb-endpoint"
+
+  ALBDNSName:
+    Description: "ALB DNS Name"
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+
+  ECSClusterName:
+    Description: "ECS Cluster Name"
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub "${ProjectName}-cluster-name"
+
+  EFSFileSystemId:
+    Description: "EFS File System ID"
+    Value: !Ref EFSFileSystem
+    Export:
+      Name: !Sub "${ProjectName}-efs-id"
+
+  LiteLLMAPIKeySecretArn:
+    Description: "ARN of the LiteLLM API Key secret"
+    Value: !Ref LiteLLMAPIKeySecret
+
+  OpenWebUIAdminSecretArn:
+    Description: "ARN of the Open WebUI admin password secret"
+    Value: !Ref OpenWebUIAdminSecret
+
+  ServiceDiscoveryNamespace:
+    Description: "Service Discovery Namespace"
+    Value: !Ref ServiceDiscoveryNamespace
+
+  LogGroupName:
+    Description: "CloudWatch Log Group Name"
+    Value: !Ref LogGroup
+
+  Region:
+    Description: "Deployment region"
+    Value: !Ref AWS::Region
+
+  BedrockRegion:
+    Description: "Bedrock API region"
+    Value: !Ref BedrockRegion

@@ -1,0 +1,20 @@
+model_list:
+  - model_name: nova-canvas
+    litellm_params:
+      model: bedrock/amazon.nova-canvas-v1:0
+      aws_region_name: us-east-1
+
+  - model_name: claude-sonnet
+    litellm_params:
+      model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
+      aws_region_name: us-east-1
+      stream: true
+
+  - model_name: titan-image
+    litellm_params:
+      model: bedrock/amazon.titan-image-generator-v2:0
+      aws_region_name: us-east-1
+
+litellm_settings:
+  drop_params: true
+  set_verbose: true
