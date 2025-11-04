@@ -3,6 +3,9 @@ model_list:
     litellm_params:
       model: bedrock/amazon.nova-canvas-v1:0
       aws_region_name: us-east-1
+      api_key: os.environ/AWS_BEARER_TOKEN_BEDROCK
+      stream: false
+      api_base: bedrock-runtime
 
   - model_name: claude-sonnet
     litellm_params:
@@ -14,6 +17,7 @@ model_list:
     litellm_params:
       model: bedrock/amazon.titan-image-generator-v2:0
       aws_region_name: us-east-1
+      streaming: false
 
 litellm_settings:
   drop_params: true
