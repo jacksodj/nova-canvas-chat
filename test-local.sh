@@ -23,12 +23,22 @@ fi
 echo "✅ Docker Compose is available"
 
 # Check AWS credentials
-if [ ! -f ~/.aws/credentials ] && [ -z "$AWS_ACCESS_KEY_ID" ]; then
-    echo "❌ AWS credentials not found. Please configure AWS CLI:"
-    echo "   aws configure"
-    exit 1
+if [ -z "$AWS_BEARER_TOKEN_BEDROCK" ]; then
+    if [ ! -f ~/.aws/credentials ] && [ -z "$AWS_ACCESS_KEY_ID" ]; then
+        echo "❌ AWS credentials not found. Please choose one authentication method:"
+        echo ""
+        echo "   Option A: Bedrock API Keys (Recommended)"
+        echo "   1. Generate at: https://console.aws.amazon.com/bedrock/api-keys"
+        echo "   2. Set: export AWS_BEARER_TOKEN_BEDROCK=your_api_key"
+        echo ""
+        echo "   Option B: IAM Credentials"
+        echo "   Run: aws configure"
+        exit 1
+    fi
+    echo "✅ Using IAM credentials from ~/.aws/credentials"
+else
+    echo "✅ Using Bedrock API Key authentication"
 fi
-echo "✅ AWS credentials found"
 
 # Check AWS region
 AWS_REGION=${AWS_REGION:-us-east-1}

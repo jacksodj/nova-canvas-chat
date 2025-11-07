@@ -51,7 +51,15 @@ cp litellm-config-generated.yaml litellm-config.yaml
 ### Option 3: Local Testing
 
 ```bash
-# Test locally with Docker
+# 1. Copy environment template
+cp .env.example .env
+
+# 2. Edit .env and add your credentials:
+#    - POSTGRE_PASSWORD (any secure password)
+#    - AWS_BEARER_TOKEN_BEDROCK (from AWS Console)
+
+# 3. Load environment and test
+source .env
 ./test-local.sh
 
 # Access at http://localhost:8080
@@ -124,6 +132,7 @@ nova-canvas-chat/
 | Document | Description |
 |----------|-------------|
 | [FINE-TUNED-MODELS-GUIDE.md](docs/FINE-TUNED-MODELS-GUIDE.md) | **⭐ Quick start for adding custom models (5 min)** |
+| [BEDROCK-API-KEYS.md](docs/BEDROCK-API-KEYS.md) | **🔑 AWS Bedrock API Keys authentication guide** |
 | [infrastructure/README.md](infrastructure/README.md) | Complete deployment guide |
 | [infrastructure/litellm-config-guide.md](infrastructure/litellm-config-guide.md) | Advanced LiteLLM configuration |
 | [LOCAL-TESTING-RESULTS.md](docs/LOCAL-TESTING-RESULTS.md) | Validation and test results |
@@ -131,7 +140,20 @@ nova-canvas-chat/
 ## 🔧 Prerequisites
 
 1. **AWS Account** with appropriate permissions
-2. **AWS CLI** configured (`aws configure`)
+2. **AWS Authentication** - Choose one method:
+
+   **Option A: Bedrock API Keys (Recommended for quick start)**
+   ```bash
+   # Generate at: https://console.aws.amazon.com/bedrock/api-keys
+   # Then set environment variable:
+   export AWS_BEARER_TOKEN_BEDROCK=your_api_key_here
+   ```
+
+   **Option B: IAM Credentials (Traditional method)**
+   ```bash
+   aws configure
+   ```
+
 3. **Bedrock Model Access** enabled in us-east-1
    ```bash
    # Check access
