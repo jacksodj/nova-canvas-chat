@@ -4,7 +4,7 @@ Production-ready text-to-image chat interface powered by AWS Bedrock Nova Canvas
 
 ## ✨ Features
 
-- 🎨 **Image Generation**: Amazon Nova Canvas, Titan Image Generator V2
+- 🎨 **Image Generation**: Amazon Nova Canvas
 - 💬 **Text Chat**: Claude 3.5 Sonnet with streaming
 - 🔧 **Fine-Tuned Models**: Easy discovery and integration of custom models
 - ⚡ **Provisioned Throughput**: Support for guaranteed capacity models
@@ -69,9 +69,8 @@ source .env
 
 The deployment includes these models by default:
 
-- ✅ **nova-canvas** - Amazon Nova Canvas v1.0 (on-demand image generation)
+- ✅ **nova-canvas** - Amazon Nova Canvas v1.0 (image generation)
 - ✅ **claude-sonnet** - Claude 3.5 Sonnet v2 (text chat with streaming)
-- ✅ **titan-image** - Titan Image Generator V2 (on-demand image generation)
 
 ## 🎯 Fine-Tuned & Custom Models
 

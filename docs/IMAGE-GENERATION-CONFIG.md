@@ -59,7 +59,7 @@ Environment:
 
 ```yaml
 model_list:
-  # Image generation models - streaming must be disabled
+  # Image generation model - streaming must be disabled
   - model_name: nova-canvas
     litellm_params:
       model: bedrock/amazon.nova-canvas-v1:0
@@ -67,12 +67,6 @@ model_list:
       api_key: os.environ/AWS_BEARER_TOKEN_BEDROCK
       stream: false  # ← Required for image models
       api_base: bedrock-runtime
-
-  - model_name: titan-image
-    litellm_params:
-      model: bedrock/amazon.titan-image-generator-v2:0
-      aws_region_name: us-east-1
-      stream: false  # ← Required for image models
 
   # Text chat models - streaming can be enabled
   - model_name: claude-sonnet
@@ -175,20 +169,14 @@ curl -X POST http://localhost:4000/v1/images/generations \
   }'
 ```
 
-### Method 3: Test All Models
+### Method 3: Test Nova Canvas via API
 
 ```bash
-# Test nova-canvas
+# Test nova-canvas image generation
 curl -X POST http://localhost:4000/v1/images/generations \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer sk-test-1234567890' \
-  -d '{"model": "nova-canvas", "prompt": "sunset", "n": 1}'
-
-# Test titan-image
-curl -X POST http://localhost:4000/v1/images/generations \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer sk-test-1234567890' \
-  -d '{"model": "titan-image", "prompt": "sunset", "n": 1}'
+  -d '{"model": "nova-canvas", "prompt": "sunset over mountains", "n": 1}'
 
 # Test claude-sonnet (text chat)
 curl -X POST http://localhost:4000/v1/chat/completions \
@@ -277,8 +265,7 @@ curl http://localhost:4000/v1/models \
 # {
 #   "data": [
 #     {"id": "nova-canvas", ...},
-#     {"id": "claude-sonnet", ...},
-#     {"id": "titan-image", ...}
+#     {"id": "claude-sonnet", ...}
 #   ]
 # }
 
@@ -290,24 +277,6 @@ docker exec openwebui env | grep IMAGE_GENERATION
 # IMAGE_GENERATION_ENGINE=openai
 # IMAGE_GENERATION_MODEL=nova-canvas
 ```
-
-## Switching to Different Image Models
-
-### Use Titan Image Generator Instead
-
-```yaml
-# In docker-compose.yml
-environment:
-  - IMAGE_GENERATION_MODEL=titan-image  # Change from nova-canvas
-```
-
-### Use Both Models (User Selectable)
-
-Open WebUI allows users to select the model in the UI settings:
-
-1. Configure multiple image models in `litellm-config.yaml`
-2. In Open WebUI, go to Settings → Models
-3. Select which model to use for image generation
 
 ## Performance Tuning
 

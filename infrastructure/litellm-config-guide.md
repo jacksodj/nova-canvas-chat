@@ -8,9 +8,8 @@ LiteLLM acts as a proxy between Open WebUI and AWS Bedrock, providing OpenAI-com
 
 **Pre-configured Models (Ready to Use):**
 The CloudFormation stack automatically configures these on-demand models:
-- ✅ `nova-canvas` - Amazon Nova Canvas v1.0
-- ✅ `claude-sonnet` - Claude 3.5 Sonnet v2 (with streaming)
-- ✅ `titan-image` - Titan Image Generator V2
+- ✅ `nova-canvas` - Amazon Nova Canvas v1.0 (image generation)
+- ✅ `claude-sonnet` - Claude 3.5 Sonnet v2 (text chat with streaming)
 
 **No manual configuration needed!** These models work immediately after deployment.
 
@@ -54,6 +53,23 @@ curl -X POST 'http://litellm:4000/model/new' \
   }'
 ```
 
+#### Amazon Nova Canvas (Image Generation)
+
+```bash
+curl -X POST 'http://litellm:4000/model/new' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -d '{
+    "model_name": "nova-canvas",
+    "litellm_params": {
+      "model": "bedrock/amazon.nova-canvas-v1:0",
+      "aws_region_name": "us-east-1",
+      "stream": false,
+      "api_base": "bedrock-runtime"
+    }
+  }'
+```
+
 #### Claude 3.5 Sonnet (Text Generation)
 
 ```bash
@@ -66,21 +82,6 @@ curl -X POST 'http://litellm:4000/model/new' \
       "model": "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0",
       "aws_region_name": "us-east-1",
       "stream": true
-    }
-  }'
-```
-
-#### Amazon Titan Image Generator V2
-
-```bash
-curl -X POST 'http://litellm:4000/model/new' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer YOUR_API_KEY' \
-  -d '{
-    "model_name": "titan-image",
-    "litellm_params": {
-      "model": "bedrock/amazon.titan-image-generator-v2:0",
-      "aws_region_name": "us-east-1"
     }
   }'
 ```
@@ -206,17 +207,14 @@ model_list:
     litellm_params:
       model: bedrock/amazon.nova-canvas-v1:0
       aws_region_name: us-east-1
+      stream: false
+      api_base: bedrock-runtime
 
   - model_name: claude-sonnet
     litellm_params:
       model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
       aws_region_name: us-east-1
       stream: true
-
-  - model_name: titan-image
-    litellm_params:
-      model: bedrock/amazon.titan-image-generator-v2:0
-      aws_region_name: us-east-1
 
   # Provisioned throughput models
   - model_name: nova-canvas-provisioned

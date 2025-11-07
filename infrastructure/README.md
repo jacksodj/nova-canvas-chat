@@ -411,9 +411,8 @@ open $ALB_ENDPOINT
    - Save credentials securely
 
 2. **Models Pre-Configured** (Ready to Use):
-   - ✅ **nova-canvas** - Amazon Nova Canvas (on-demand image generation)
+   - ✅ **nova-canvas** - Amazon Nova Canvas (image generation)
    - ✅ **claude-sonnet** - Claude 3.5 Sonnet (text chat with streaming)
-   - ✅ **titan-image** - Titan Image Generator V2 (on-demand image generation)
 
    All models are configured automatically and ready to use immediately!
 

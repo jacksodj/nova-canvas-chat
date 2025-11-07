@@ -2,14 +2,14 @@
 
 ## ✅ Test Status: **SUCCESSFUL**
 
-Date: November 1, 2025
-Configuration: On-demand Bedrock models (Nova Canvas, Claude Sonnet, Titan Image)
+Date: November 7, 2025
+Configuration: On-demand Bedrock models (Nova Canvas, Claude Sonnet)
 
 ## Test Results
 
 ### 1. LiteLLM Proxy ✅
 - **Status**: Running successfully on port 4000
-- **Configuration**: Using inline YAML config with 3 models
+- **Configuration**: Using inline YAML config with 2 models
 - **Authentication**: Master key configured
 
 ### 2. Model Configuration ✅
@@ -17,7 +17,6 @@ Successfully configured models:
 ```
 ✅ nova-canvas - Amazon Nova Canvas v1.0 (image generation)
 ✅ claude-sonnet - Claude 3.5 Sonnet v2 (text chat)
-✅ titan-image - Titan Image Generator V2 (image generation)
 ```
 
 ### 3. API Endpoints ✅

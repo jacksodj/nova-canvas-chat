@@ -99,7 +99,7 @@ Parameters:
 
   EnabledModels:
     Type: CommaDelimitedList
-    Default: "nova-canvas,claude-sonnet,titan-image"
+    Default: "nova-canvas,claude-sonnet"
     Description: "Comma-separated list of models to enable"
 
   ACMCertificateArn:
@@ -656,15 +656,13 @@ Resources:
                     litellm_params:
                       model: bedrock/amazon.nova-canvas-v1:0
                       aws_region_name: ${BedrockRegion}
+                      stream: false
+                      api_base: bedrock-runtime
                   - model_name: claude-sonnet
                     litellm_params:
                       model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
                       aws_region_name: ${BedrockRegion}
                       stream: true
-                  - model_name: titan-image
-                    litellm_params:
-                      model: bedrock/amazon.titan-image-generator-v2:0
-                      aws_region_name: ${BedrockRegion}
                 litellm_settings:
                   drop_params: true
                   set_verbose: false
