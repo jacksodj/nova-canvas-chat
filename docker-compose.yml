@@ -24,7 +24,6 @@ services:
       - LITELLM_MODE=PROXY
       - LITELLM_MASTER_KEY=sk-test-1234567890
       - DATABASE_URL=postgresql://litellm_user:${POSTGRE_PASSWORD}@litellm-db:5432/litellm_db
-      - AWS_BEARER_TOKEN_BEDROCK=${AWS_BEARER_TOKEN_BEDROCK}
     volumes:
       - ~/.aws:/root/.aws:ro
       - ./litellm-config.yaml:/app/config.yaml:ro
