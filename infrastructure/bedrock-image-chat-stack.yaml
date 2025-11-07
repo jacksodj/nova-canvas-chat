@@ -714,6 +714,8 @@ Resources:
               Value: "True"
             - Name: IMAGE_GENERATION_ENGINE
               Value: "openai"
+            - Name: IMAGE_GENERATION_MODEL
+              Value: "nova-canvas"
             - Name: AUTOMATIC_IMAGE_GENERATION
               Value: "False"
             - Name: ENV

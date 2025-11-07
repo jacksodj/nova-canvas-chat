@@ -48,6 +48,7 @@ services:
       - WEBUI_NAME=Bedrock Image Chat (Local)
       - ENABLE_IMAGE_GENERATION=True
       - IMAGE_GENERATION_ENGINE=openai
+      - IMAGE_GENERATION_MODEL=nova-canvas
       - AUTOMATIC_IMAGE_GENERATION=False
       - ENV=development
     volumes:

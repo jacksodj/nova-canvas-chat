@@ -17,7 +17,7 @@ model_list:
     litellm_params:
       model: bedrock/amazon.titan-image-generator-v2:0
       aws_region_name: us-east-1
-      streaming: false
+      stream: false
 
 litellm_settings:
   drop_params: true

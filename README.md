@@ -132,6 +132,7 @@ nova-canvas-chat/
 | Document | Description |
 |----------|-------------|
 | [FINE-TUNED-MODELS-GUIDE.md](docs/FINE-TUNED-MODELS-GUIDE.md) | **⭐ Quick start for adding custom models (5 min)** |
+| [IMAGE-GENERATION-CONFIG.md](docs/IMAGE-GENERATION-CONFIG.md) | **🎨 Image generation configuration & troubleshooting** |
 | [BEDROCK-API-KEYS.md](docs/BEDROCK-API-KEYS.md) | **🔑 AWS Bedrock API Keys authentication guide** |
 | [infrastructure/README.md](infrastructure/README.md) | Complete deployment guide |
 | [infrastructure/litellm-config-guide.md](infrastructure/litellm-config-guide.md) | Advanced LiteLLM configuration |
@@ -204,6 +205,33 @@ curl -X POST 'http://localhost:4000/v1/images/generations' \
 Results: See [LOCAL-TESTING-RESULTS.md](docs/LOCAL-TESTING-RESULTS.md)
 
 ## 🚨 Common Issues & Solutions
+
+### Issue: Images not generating in Open WebUI
+
+**Root Causes**:
+1. Open WebUI doesn't know which model to use
+2. Nova Canvas doesn't support streaming
+
+**Solution**: Verify these configurations are set correctly
+
+```bash
+# In docker-compose.yml
+IMAGE_GENERATION_MODEL=nova-canvas  # ← Must be set!
+
+# In litellm-config.yaml
+stream: false  # ← Required for image models
+```
+
+**Quick Fix**:
+```bash
+# Check if config is correct
+docker exec openwebui env | grep IMAGE_GENERATION_MODEL
+
+# If missing, it's already fixed in latest version - just restart:
+docker compose down && docker compose up -d
+```
+
+See [IMAGE-GENERATION-CONFIG.md](docs/IMAGE-GENERATION-CONFIG.md) for detailed troubleshooting.
 
 ### Issue: Can't find my fine-tuned model
 
