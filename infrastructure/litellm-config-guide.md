@@ -64,8 +64,7 @@ curl -X POST 'http://litellm:4000/model/new' \
     "litellm_params": {
       "model": "bedrock/amazon.nova-canvas-v1:0",
       "aws_region_name": "us-east-1",
-      "stream": false,
-      "api_base": "bedrock-runtime"
+      "stream": false
     }
   }'
 ```
@@ -208,7 +207,6 @@ model_list:
       model: bedrock/amazon.nova-canvas-v1:0
       aws_region_name: us-east-1
       stream: false
-      api_base: bedrock-runtime
 
   - model_name: claude-sonnet
     litellm_params:

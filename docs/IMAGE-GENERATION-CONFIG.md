@@ -66,7 +66,6 @@ model_list:
       aws_region_name: us-east-1
       api_key: os.environ/AWS_BEARER_TOKEN_BEDROCK
       stream: false  # ← Required for image models
-      api_base: bedrock-runtime
 
   # Text chat models - streaming can be enabled
   - model_name: claude-sonnet
