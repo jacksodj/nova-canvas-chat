@@ -656,7 +656,6 @@ Resources:
                     litellm_params:
                       model: bedrock/amazon.nova-canvas-v1:0
                       aws_region_name: ${BedrockRegion}
-                      stream: false
                   - model_name: claude-sonnet
                     litellm_params:
                       model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
