@@ -633,7 +633,7 @@ Resources:
       TaskRoleArn: !GetAtt ECSTaskRole.Arn
       ContainerDefinitions:
         - Name: litellm
-          Image: ghcr.io/berriai/litellm:main-latest
+          Image: ghcr.io/berriai/litellm:main-stable
           Essential: true
           PortMappings:
             - ContainerPort: 4000
