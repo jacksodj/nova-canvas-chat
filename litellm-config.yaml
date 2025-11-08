@@ -5,6 +5,7 @@ model_list:
       aws_region_name: us-east-1
       api_key: os.environ/AWS_BEARER_TOKEN_BEDROCK
       stream: false
+      additional_drop_params: ["stream"]
 
   - model_name: claude-sonnet
     litellm_params:
