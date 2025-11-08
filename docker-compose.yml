@@ -36,6 +36,28 @@ services:
       retries: 5
       start_period: 15s
 
+  litellm-image:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: litellm-image-proxy
+    ports:
+      - "4100:4100"
+    environment:
+      - AWS_REGION_NAME=us-east-1
+      - LITELLM_MODE=PROXY
+      - LITELLM_MASTER_KEY=sk-test-1234567890
+      - DATABASE_URL=postgresql://litellm_user:${POSTGRE_PASSWORD}@litellm-db:5432/litellm_db
+      - AWS_BEARER_TOKEN_BEDROCK=${AWS_BEARER_TOKEN_BEDROCK}
+    volumes:
+      - ~/.aws:/root/.aws:ro
+      - ./litellm-image-config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4100", "--host", "0.0.0.0"]
+    healthcheck:
+      test: ["CMD-SHELL","wget","--quiet","--tries=1","http://localhost:4100/health/liveliness"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   openwebui:
     image: ghcr.io/open-webui/open-webui:v0.6.36
     container_name: openwebui
@@ -49,12 +71,15 @@ services:
       - ENABLE_IMAGE_GENERATION=True
       - IMAGE_GENERATION_ENGINE=openai
       - IMAGE_GENERATION_MODEL=nova-canvas
+      - IMAGES_OPENAI_API_BASE_URL=http://litellm-image:4100/v1
+      - IMAGES_OPENAI_API_KEY=sk-test-1234567890
       - AUTOMATIC_IMAGE_GENERATION=False
       - ENV=development
     volumes:
       - open-webui-data:/app/backend/data
     depends_on:
       - litellm
+      - litellm-image
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s

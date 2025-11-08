@@ -1,9 +1,9 @@
 model_list:
-  - model_name: claude-sonnet
+  - model_name: nova-canvas
     litellm_params:
-      model: bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0
+      model: bedrock/amazon.nova-canvas-v1:0
       aws_region_name: us-east-1
-      stream: true
+      api_key: os.environ/AWS_BEARER_TOKEN_BEDROCK
 
 litellm_settings:
   drop_params: true
