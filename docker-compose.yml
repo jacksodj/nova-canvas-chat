@@ -15,7 +15,7 @@ services:
       retries: 5
 
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    image: ghcr.io/berriai/litellm:main-stable
     container_name: litellm-proxy
     ports:
       - "4000:4000"
@@ -48,6 +48,7 @@ services:
       - WEBUI_NAME=Bedrock Image Chat (Local)
       - ENABLE_IMAGE_GENERATION=True
       - IMAGE_GENERATION_ENGINE=openai
+      - IMAGE_GENERATION_MODEL=nova-canvas
       - AUTOMATIC_IMAGE_GENERATION=False
       - ENV=development
     volumes:

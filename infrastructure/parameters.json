@@ -41,7 +41,7 @@
   },
   {
     "ParameterKey": "EnabledModels",
-    "ParameterValue": "nova-canvas,claude-sonnet,titan-image"
+    "ParameterValue": "nova-canvas,claude-sonnet"
   },
   {
     "ParameterKey": "ACMCertificateArn",

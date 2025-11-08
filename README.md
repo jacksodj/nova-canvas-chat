@@ -4,7 +4,7 @@ Production-ready text-to-image chat interface powered by AWS Bedrock Nova Canvas
 
 ## ✨ Features
 
-- 🎨 **Image Generation**: Amazon Nova Canvas, Titan Image Generator V2
+- 🎨 **Image Generation**: Amazon Nova Canvas
 - 💬 **Text Chat**: Claude 3.5 Sonnet with streaming
 - 🔧 **Fine-Tuned Models**: Easy discovery and integration of custom models
 - ⚡ **Provisioned Throughput**: Support for guaranteed capacity models
@@ -51,7 +51,15 @@ cp litellm-config-generated.yaml litellm-config.yaml
 ### Option 3: Local Testing
 
 ```bash
-# Test locally with Docker
+# 1. Copy environment template
+cp .env.example .env
+
+# 2. Edit .env and add your credentials:
+#    - POSTGRE_PASSWORD (any secure password)
+#    - AWS_BEARER_TOKEN_BEDROCK (from AWS Console)
+
+# 3. Load environment and test
+source .env
 ./test-local.sh
 
 # Access at http://localhost:8080
@@ -61,9 +69,8 @@ cp litellm-config-generated.yaml litellm-config.yaml
 
 The deployment includes these models by default:
 
-- ✅ **nova-canvas** - Amazon Nova Canvas v1.0 (on-demand image generation)
+- ✅ **nova-canvas** - Amazon Nova Canvas v1.0 (image generation)
 - ✅ **claude-sonnet** - Claude 3.5 Sonnet v2 (text chat with streaming)
-- ✅ **titan-image** - Titan Image Generator V2 (on-demand image generation)
 
 ## 🎯 Fine-Tuned & Custom Models
 
@@ -124,6 +131,8 @@ nova-canvas-chat/
 | Document | Description |
 |----------|-------------|
 | [FINE-TUNED-MODELS-GUIDE.md](docs/FINE-TUNED-MODELS-GUIDE.md) | **⭐ Quick start for adding custom models (5 min)** |
+| [IMAGE-GENERATION-CONFIG.md](docs/IMAGE-GENERATION-CONFIG.md) | **🎨 Image generation configuration & troubleshooting** |
+| [BEDROCK-API-KEYS.md](docs/BEDROCK-API-KEYS.md) | **🔑 AWS Bedrock API Keys authentication guide** |
 | [infrastructure/README.md](infrastructure/README.md) | Complete deployment guide |
 | [infrastructure/litellm-config-guide.md](infrastructure/litellm-config-guide.md) | Advanced LiteLLM configuration |
 | [LOCAL-TESTING-RESULTS.md](docs/LOCAL-TESTING-RESULTS.md) | Validation and test results |
@@ -131,7 +140,20 @@ nova-canvas-chat/
 ## 🔧 Prerequisites
 
 1. **AWS Account** with appropriate permissions
-2. **AWS CLI** configured (`aws configure`)
+2. **AWS Authentication** - Choose one method:
+
+   **Option A: Bedrock API Keys (Recommended for quick start)**
+   ```bash
+   # Generate at: https://console.aws.amazon.com/bedrock/api-keys
+   # Then set environment variable:
+   export AWS_BEARER_TOKEN_BEDROCK=your_api_key_here
+   ```
+
+   **Option B: IAM Credentials (Traditional method)**
+   ```bash
+   aws configure
+   ```
+
 3. **Bedrock Model Access** enabled in us-east-1
    ```bash
    # Check access
@@ -182,6 +204,33 @@ curl -X POST 'http://localhost:4000/v1/images/generations' \
 Results: See [LOCAL-TESTING-RESULTS.md](docs/LOCAL-TESTING-RESULTS.md)
 
 ## 🚨 Common Issues & Solutions
+
+### Issue: Images not generating in Open WebUI
+
+**Root Causes**:
+1. Open WebUI doesn't know which model to use
+2. Nova Canvas doesn't support streaming
+
+**Solution**: Verify these configurations are set correctly
+
+```bash
+# In docker-compose.yml
+IMAGE_GENERATION_MODEL=nova-canvas  # ← Must be set!
+
+# In litellm-config.yaml
+stream: false  # ← Required for image models
+```
+
+**Quick Fix**:
+```bash
+# Check if config is correct
+docker exec openwebui env | grep IMAGE_GENERATION_MODEL
+
+# If missing, it's already fixed in latest version - just restart:
+docker compose down && docker compose up -d
+```
+
+See [IMAGE-GENERATION-CONFIG.md](docs/IMAGE-GENERATION-CONFIG.md) for detailed troubleshooting.
 
 ### Issue: Can't find my fine-tuned model
 
