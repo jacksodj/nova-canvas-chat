@@ -379,6 +379,10 @@ Resources:
           FromPort: 4000
           ToPort: 4000
           Description: "LiteLLM internal"
+        - IpProtocol: tcp
+          FromPort: 4100
+          ToPort: 4100
+          Description: "LiteLLM image generation"
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
@@ -594,6 +598,18 @@ Resources:
       HealthCheckCustomConfig:
         FailureThreshold: 1
 
+  LiteLLMImageServiceDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: litellm-image
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 60
+        NamespaceId: !Ref ServiceDiscoveryNamespace
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+
   # ============================================================================
   # ECS Cluster
   # ============================================================================
@@ -652,10 +668,6 @@ Resources:
             - Name: LITELLM_CONFIG
               Value: !Sub |
                 model_list:
-                  - model_name: nova-canvas
-                    litellm_params:
-                      model: bedrock/amazon.nova-canvas-v1:0
-                      aws_region_name: ${BedrockRegion}
                   - model_name: claude-sonnet
                     litellm_params:
                       model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
@@ -674,6 +686,60 @@ Resources:
             Command:
               - CMD-SHELL
               - curl -f http://localhost:4000/health || exit 1
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+
+  LiteLLMImageTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ProjectName}-litellm-image"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: '512'
+      Memory: '1024'
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: litellm-image
+          Image: ghcr.io/berriai/litellm:main-stable
+          Essential: true
+          PortMappings:
+            - ContainerPort: 4100
+              Protocol: tcp
+          Environment:
+            - Name: AWS_REGION_NAME
+              Value: !Ref BedrockRegion
+            - Name: LITELLM_MODE
+              Value: PROXY
+            - Name: LITELLM_MASTER_KEY
+              Value: !Sub "{{resolve:secretsmanager:${LiteLLMAPIKeySecret}:SecretString:api_key}}"
+            - Name: DATABASE_URL
+              Value: "sqlite:////tmp/litellm-image.db"
+            - Name: STORE_MODEL_IN_DB
+              Value: "True"
+            - Name: LITELLM_CONFIG
+              Value: !Sub |
+                model_list:
+                  - model_name: nova-canvas
+                    litellm_params:
+                      model: bedrock/amazon.nova-canvas-v1:0
+                      aws_region_name: ${BedrockRegion}
+                litellm_settings:
+                  drop_params: true
+                  set_verbose: false
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: litellm-image
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - curl -f http://localhost:4100/health || exit 1
             Interval: 30
             Timeout: 5
             Retries: 3
@@ -712,6 +778,10 @@ Resources:
               Value: "openai"
             - Name: IMAGE_GENERATION_MODEL
               Value: "nova-canvas"
+            - Name: IMAGES_OPENAI_API_BASE_URL
+              Value: !Sub "http://litellm-image.${ProjectName}.local:4100/v1"
+            - Name: IMAGES_OPENAI_API_KEY
+              Value: !Sub "{{resolve:secretsmanager:${LiteLLMAPIKeySecret}:SecretString:api_key}}"
             - Name: AUTOMATIC_IMAGE_GENERATION
               Value: "False"
             - Name: ENV
@@ -852,11 +922,38 @@ Resources:
         - Key: Name
           Value: !Sub "${ProjectName}-litellm-service"
 
+  LiteLLMImageService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - LiteLLMImageServiceDiscovery
+    Properties:
+      ServiceName: !Sub "${ProjectName}-litellm-image"
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref LiteLLMImageTaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+          SecurityGroups:
+            - !Ref ContainerSecurityGroup
+      ServiceRegistries:
+        - RegistryArn: !GetAtt LiteLLMImageServiceDiscovery.Arn
+      EnableExecuteCommand: true
+      PropagateTags: SERVICE
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-litellm-image-service"
+
   OpenWebUIService:
     Type: AWS::ECS::Service
     DependsOn:
       - HTTPListener
       - LiteLLMService
+      - LiteLLMImageService
       - EFSMountTarget1
       - EFSMountTarget2
     Properties:
