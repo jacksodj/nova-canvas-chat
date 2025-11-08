@@ -9,7 +9,7 @@ model_list:
 
   - model_name: claude-sonnet
     litellm_params:
-      model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
+      model: bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0
       aws_region_name: us-east-1
       stream: true
 
